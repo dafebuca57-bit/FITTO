@@ -1,0 +1,8 @@
+{
+  "appId": "com.fitto.app",
+  "appName": "Fitto",
+  "webDir": "dist",
+  "android": {
+    "backgroundColor": "#F2EDE4"
+  }
+}
