@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { takePhoto } from '../lib/image.js';
 import Icon from '../components/Icon.jsx';
+import Camara from './Camara.jsx';
 
 const TONES = [
   { id: 'calido', label: 'Verdosas', hint: 'Subtono cálido' },
@@ -14,6 +15,7 @@ export default function Onboarding({ onDone }) {
   const [tone, setTone] = useState('neutro');
   const [photo, setPhoto] = useState(null);
   const [error, setError] = useState('');
+  const [camera, setCamera] = useState(false);
 
   async function shoot(gallery) {
     setError('');
@@ -80,7 +82,7 @@ export default function Onboarding({ onDone }) {
         <section className="stack mt24" style={{ flex: 1 }}>
           <h1 className="h1">Tu foto para el probador<span className="dot">.</span></h1>
           <p className="muted" style={{ margin: 0, fontSize: 14, lineHeight: 1.4 }}>
-            De frente, de la cabeza a la cintura o cuerpo completo, con buena luz y fondo simple. Se guarda solo en tu teléfono.
+            Te guiamos con una silueta para que la IA te vista bien. De frente, con buena luz y fondo simple. Se guarda solo en tu teléfono.
           </p>
           <div className="photo-frame" style={{ maxHeight: '46vh', aspectRatio: 'auto', height: '46vh' }}>
             {photo ? (
@@ -94,7 +96,7 @@ export default function Onboarding({ onDone }) {
           </div>
           {error && <div className="error-box" role="alert">{error}</div>}
           <div className="row">
-            <button type="button" className="btn btn-ink" style={{ flex: 1 }} onClick={() => shoot(false)}>
+            <button type="button" className="btn btn-ink" style={{ flex: 1 }} onClick={() => setCamera(true)}>
               <Icon name="camera" size={18} /> {photo ? 'Repetir' : 'Tomar foto'}
             </button>
             <button type="button" className="btn btn-ghost" onClick={() => shoot(true)} aria-label="Elegir de la galería">
@@ -106,6 +108,7 @@ export default function Onboarding({ onDone }) {
           </button>
         </section>
       )}
+      {camera && <Camara onClose={() => setCamera(false)} onPhoto={(p) => { setPhoto(p); setCamera(false); }} />}
     </main>
   );
 }

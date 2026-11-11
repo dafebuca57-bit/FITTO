@@ -5,6 +5,7 @@ import { keepOriginalOutsideBinaryMask, keepOriginalOutsideGarment, toTryOnFrame
 import { takePhoto } from '../lib/image.js';
 import { compliment, outfitScore } from '../lib/style.js';
 import { tryOn } from '../lib/tryon.js';
+import Camara from './Camara.jsx';
 import { uid } from '../lib/store.js';
 
 // Para una sola prenda, el puntaje depende de qué tan bien va su color con tu subtono.
@@ -23,6 +24,7 @@ export default function Probador({ data, actions, initialItemId }) {
   const [result, setResult] = useState(null);
   const [showOriginal, setShowOriginal] = useState(false);
   const [error, setError] = useState('');
+  const [camera, setCamera] = useState(false);
   const timer = useRef();
 
   useEffect(() => () => clearInterval(timer.current), []);
@@ -31,13 +33,20 @@ export default function Probador({ data, actions, initialItemId }) {
   const sel = items.find((i) => i.id === selId) ?? null;
 
   async function newPhoto(gallery) {
+    if (!gallery) return setCamera(true);
     try {
-      const photo = await takePhoto(gallery);
+      const photo = await takePhoto(true);
       actions.setProfile({ ...profile, photo });
       setResult(null);
     } catch (e) {
       if (!String(e?.message).toLowerCase().includes('cancel')) setError('No se pudo obtener la foto.');
     }
+  }
+
+  function usePhoto(photo) {
+    setCamera(false);
+    actions.setProfile({ ...profile, photo });
+    setResult(null);
   }
 
   async function run() {
@@ -186,6 +195,9 @@ export default function Probador({ data, actions, initialItemId }) {
             ))}
           </div>
         </section>
+      )}
+      {camera && (
+        <Camara onClose={() => setCamera(false)} onPhoto={usePhoto} initialMode={sel && sel.category !== 'superior' ? 'completo' : 'medio'} />
       )}
     </main>
   );

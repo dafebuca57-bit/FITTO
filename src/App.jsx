@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { loadAll, saveLooks, saveProfile, saveStreak, saveWardrobe } from './lib/store.js';
 import { registerActivity } from './lib/streak.js';
+import { ART_VERSION, renderGarment } from './lib/garmentArt.js';
 import Icon from './components/Icon.jsx';
 import Onboarding from './screens/Onboarding.jsx';
 import Hoy from './screens/Hoy.jsx';
@@ -31,7 +32,17 @@ export default function App() {
   const toastTimer = useRef();
 
   useEffect(() => {
-    loadAll().then(setData);
+    loadAll().then((d) => {
+      // Redibuja las prendas rápidas guardadas con la versión más realista del dibujo.
+      let changed = false;
+      const wardrobe = d.wardrobe.map((w) => {
+        if (!w.generic || w.artVersion === ART_VERSION || !w.type) return w;
+        changed = true;
+        return { ...w, image: renderGarment(w.type, w.color, w.fit), artVersion: ART_VERSION };
+      });
+      if (changed) saveWardrobe(wardrobe);
+      setData({ ...d, wardrobe });
+    });
   }, []);
 
   const showToast = useCallback((msg) => {

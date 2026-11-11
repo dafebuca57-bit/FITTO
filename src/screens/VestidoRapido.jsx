@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import Icon from '../components/Icon.jsx';
 import { COLORS, FITS, TYPES, colorById, colorName, typeById } from '../lib/garments.js';
-import { renderGenericGarment } from '../lib/image.js';
+import { ART_VERSION, renderGarment } from '../lib/garmentArt.js';
 import { uid } from '../lib/store.js';
 
 export default function VestidoRapido({ onClose, onAdd }) {
@@ -15,7 +15,7 @@ export default function VestidoRapido({ onClose, onAdd }) {
   const f = FITS.find((x) => x.id === corte);
   const cName = colorName(c.id, t.g);
   const name = `${t.label} ${cName}`;
-  const preview = useMemo(() => renderGenericGarment(t.d, c.hex, corte), [t, c, corte]);
+  const preview = useMemo(() => renderGarment(t.id, c.hex, corte), [t, c, corte]);
 
   function add(close) {
     onAdd({
@@ -29,6 +29,7 @@ export default function VestidoRapido({ onClose, onAdd }) {
       fit: corte,
       image: preview,
       generic: true,
+      artVersion: ART_VERSION,
       createdAt: Date.now(),
     });
     setAdded((n) => n + 1);
