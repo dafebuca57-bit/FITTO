@@ -153,6 +153,36 @@ export async function keepOriginalOutsideBinaryMask(frameUrl, generatedUrl, mask
     md.data[i + 3] = on ? 255 : 0;
   }
   if (count < sw * sh * 0.01) return generatedUrl;
+
+  // Quédate solo con la zona de ropa más grande (la pegada al cuerpo): descarta pedazos sueltos
+  // que la IA marca por error en el fondo.
+  const N = sw * sh;
+  const label = new Int32Array(N);
+  let best = 0, bestSize = 0, next = 0;
+  const stack = new Int32Array(N);
+  for (let p = 0; p < N; p++) {
+    if (!md.data[p * 4 + 3] || label[p]) continue;
+    next++;
+    let top = 0, size = 0;
+    stack[top++] = p;
+    label[p] = next;
+    while (top) {
+      const q = stack[--top];
+      size++;
+      const x = q % sw;
+      const nb = [x > 0 ? q - 1 : -1, x < sw - 1 ? q + 1 : -1, q - sw, q + sw];
+      for (const r of nb) {
+        if (r < 0 || r >= N || label[r] || !md.data[r * 4 + 3]) continue;
+        label[r] = next;
+        stack[top++] = r;
+      }
+    }
+    if (size > bestSize) {
+      bestSize = size;
+      best = next;
+    }
+  }
+  for (let p = 0; p < N; p++) if (label[p] !== best) md.data[p * 4 + 3] = 0;
   mctx.putImageData(md, 0, 0);
 
   // Un poco de margen y borde suave para que no se note la unión.
