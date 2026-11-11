@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Icon from '../components/Icon.jsx';
-import { canTryOn } from '../lib/garments.js';
+import { canTryOn, englishDescription } from '../lib/garments.js';
+import { keepOriginalOutsideGarment } from '../lib/composite.js';
 import { takePhoto } from '../lib/image.js';
 import { compliment, outfitScore } from '../lib/style.js';
 import { tryOn } from '../lib/tryon.js';
@@ -48,7 +49,16 @@ export default function Probador({ data, actions, initialItemId }) {
     const start = Date.now();
     timer.current = setInterval(() => setElapsed(Math.round((Date.now() - start) / 1000)), 1000);
     try {
-      const image = await tryOn(profile.photo, sel.image, sel.name);
+      const raw = await tryOn(profile.photo, sel.image, englishDescription(sel, profile.body));
+      // Conserva tu cara, cabello y fondo: de la IA solo se usa la zona de la prenda.
+      let image = raw.image;
+      if (raw.mask) {
+        try {
+          image = await keepOriginalOutsideGarment(profile.photo, raw.image, raw.mask);
+        } catch {
+          image = raw.image;
+        }
+      }
       const score = garmentScore(sel, profile.tone, wardrobe);
       const praise = compliment(score, { colorName: sel.colorName, tone: profile.tone, seed: Date.now() % 7 });
       const look = { id: uid(), itemId: sel.id, itemName: sel.name, image, score, praise, createdAt: Date.now() };
@@ -142,8 +152,21 @@ export default function Probador({ data, actions, initialItemId }) {
         )}
       </section>
 
-      <button type="button" className="btn btn-lime btn-block mt16" disabled={!sel || !profile.photo || busy} onClick={run}>
-        <Icon name="spark" size={18} /> {busy ? 'Generando…' : result ? 'Probar otra vez' : `Probarme ${sel ? sel.name.toLowerCase() : 'esta prenda'}`}
+      <div className="between mt16" style={{ gap: 12 }}>
+        <p className="eyebrow" style={{ margin: 0 }}>Tu cuerpo</p>
+        <div className="segmented" role="group" aria-label="Tipo de cuerpo para el probador" style={{ background: 'var(--ink-2)', flex: 1, maxWidth: 240 }}>
+          {[{ id: 'hombre', label: 'Hombre' }, { id: 'mujer', label: 'Mujer' }].map((b) => (
+            <button key={b.id} type="button" aria-pressed={profile.body === b.id}
+              style={profile.body === b.id ? { background: 'var(--lime)', color: 'var(--ink)' } : { color: 'var(--paper)' }}
+              onClick={() => actions.setProfile({ ...profile, body: b.id })}>
+              {b.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <button type="button" className="btn btn-lime btn-block mt12" disabled={!sel || !profile.photo || busy || !profile.body} onClick={run}>
+        <Icon name="spark" size={18} /> {busy ? 'Generando…' : !profile.body ? 'Elige tu tipo de cuerpo' : result ? 'Probar otra vez' : `Probarme ${sel ? sel.name.toLowerCase() : 'esta prenda'}`}
       </button>
 
       {looks.length > 0 && (

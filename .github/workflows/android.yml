@@ -53,7 +53,8 @@ jobs:
         with:
           tag_name: build-${{ github.run_number }}
           name: Fitto build ${{ github.run_number }}
-          prerelease: true
+          prerelease: false
+          make_latest: true
           files: fitto.apk
           body: |
             APK de prueba de Fitto. Descárgalo desde el teléfono e instálalo

@@ -6,7 +6,7 @@ App para planear tu vestimenta: armario rápido sin fotos ("Vestido Rápido"), o
 
 Cada vez que se sube código a `main`, GitHub Actions compila el APK:
 
-1. Ve a **Releases** en este repositorio y abre el build más reciente.
+1. Enlace fijo a la última versión: https://github.com/dafebuca57-bit/FITTO/releases/latest/download/fitto.apk
 2. Descarga `fitto.apk` desde el teléfono e instálalo (Android pedirá permitir apps de fuentes desconocidas).
 
 También queda como artefacto en la pestaña **Actions**.

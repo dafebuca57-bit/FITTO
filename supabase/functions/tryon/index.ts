@@ -74,7 +74,7 @@ async function upload(prefix: string, blob: Blob, name: string) {
   return { path: paths[0], orig_name: name, meta: { _type: "gradio.FileData" } };
 }
 
-async function runTryOn(person: Blob, garment: Blob, description: string): Promise<string> {
+async function runTryOn(person: Blob, garment: Blob, description: string): Promise<{ image: string; mask: string | null }> {
   const { prefix, fnIndex } = await spaceInfo();
   const personFile = await upload(prefix, person, "persona.jpg");
   const garmentFile = await upload(prefix, garment, "prenda.png");
@@ -131,11 +131,20 @@ async function runTryOn(person: Blob, garment: Blob, description: string): Promi
           if (/quota|GPU/i.test(err)) throw new Error("Se agotó la cuota gratuita del modelo por ahora. Intenta más tarde.");
           throw new Error(err ? `El modelo devolvió un error: ${err}` : "El modelo no pudo generar la imagen. Prueba con otra foto.");
         }
-        const file = msg.output.data[0] as { url?: string; path?: string } | string;
-        const url = typeof file === "string" ? `${SPACE}${prefix}/file=${file}` : file?.url ?? `${SPACE}${prefix}/file=${file?.path}`;
-        const img = await fetch(url, { headers: authHeaders() });
+        const fileUrl = (file: { url?: string; path?: string } | string) =>
+          typeof file === "string" ? `${SPACE}${prefix}/file=${file}` : file?.url ?? `${SPACE}${prefix}/file=${file?.path}`;
+        const img = await fetch(fileUrl(msg.output.data[0] as { url?: string; path?: string }), { headers: authHeaders() });
         if (!img.ok) throw new Error("No se pudo descargar la imagen generada");
-        return await blobToDataUrl(await img.blob());
+        const image = await blobToDataUrl(await img.blob());
+        // Segunda salida: la máscara de la zona de la prenda (para conservar cara y cabello originales).
+        let mask: string | null = null;
+        try {
+          const m = await fetch(fileUrl(msg.output.data[1] as { url?: string; path?: string }), { headers: authHeaders() });
+          if (m.ok) mask = await blobToDataUrl(await m.blob());
+        } catch {
+          mask = null;
+        }
+        return { image, mask };
       }
     }
   } finally {
@@ -154,9 +163,9 @@ Deno.serve(async (req) => {
     const { person, garment, description } = body ?? {};
     if (!person || !garment) return json({ error: "Faltan la foto de la persona o de la prenda" }, 400);
 
-    const image = await runTryOn(await toBlob(String(person)), await toBlob(String(garment)), String(description ?? "prenda de vestir"));
-    if (body?.check) return json({ ok: true, bytes: image.length, head: image.slice(0, 30) });
-    return json({ image });
+    const { image, mask } = await runTryOn(await toBlob(String(person)), await toBlob(String(garment)), String(description ?? "top"));
+    if (body?.check) return json({ ok: true, bytes: image.length, head: image.slice(0, 30), mask: mask ? mask.slice(0, 30) : null, maskBytes: mask?.length ?? 0 });
+    return json({ image, mask });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : String(e) }, 502);
   }

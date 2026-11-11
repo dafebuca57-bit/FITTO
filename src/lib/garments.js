@@ -71,3 +71,16 @@ export function colorName(colorId, g = 'm') {
   if (!root) return c.label.toLowerCase();
   return root + { m: 'o', f: 'a', mp: 'os', fp: 'as' }[g];
 }
+
+// Descripción en inglés para el modelo de IA (entiende mejor inglés que español).
+const EN_TYPE = { camisa: 'shirt', camiseta: 't-shirt', sueter: 'sweater', chaqueta: 'jacket', vestido: 'dress' };
+const EN_COLOR = {
+  negro: 'black', blanco: 'white', gris: 'gray', crema: 'cream', cafe: 'brown', azul: 'navy blue',
+  celeste: 'light blue', oliva: 'olive green', verde: 'green', rojo: 'red', rosa: 'pink', amarillo: 'mustard yellow',
+};
+export function englishDescription(item, body) {
+  const colorId = item.colorId ?? (item.generic ? COLORS.find((c) => c.hex === item.color)?.id : null);
+  const type = EN_TYPE[item.type] ?? 'top';
+  const who = body === 'hombre' ? "men's " : body === 'mujer' ? "women's " : '';
+  return `${who}${colorId ? EN_COLOR[colorId] + ' ' : ''}${type}`.trim();
+}

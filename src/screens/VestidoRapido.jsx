@@ -24,6 +24,7 @@ export default function VestidoRapido({ onClose, onAdd }) {
       category: t.category,
       type: t.id,
       color: c.hex,
+      colorId: c.id,
       colorName: cName,
       fit: corte,
       image: preview,
