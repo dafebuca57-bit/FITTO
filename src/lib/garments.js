@@ -59,8 +59,10 @@ export const FITS = [
 export const typeById = (id) => TYPES.find((t) => t.id === id);
 export const colorById = (id) => COLORS.find((c) => c.id === id);
 
-// Solo prendas superiores (y vestidos, en modo experimental) se pueden probar con IA.
-export const canTryOn = (item) => item.category === 'superior' || item.category === 'vestido';
+// Se pueden probar con IA: superiores, inferiores y vestidos (el calzado todavía no).
+export const canTryOn = (item) => ['superior', 'inferior', 'vestido'].includes(item.category);
+export const garmentTypeFor = (item) =>
+  item.category === 'inferior' ? 'lower_body' : item.category === 'vestido' ? 'dresses' : 'upper_body';
 
 // Concordancia del color con la prenda: "Camisa blanca", "Jeans negros".
 const VARIABLE = { negro: 'negr', blanco: 'blanc', rojo: 'roj' };

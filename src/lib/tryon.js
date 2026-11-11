@@ -28,9 +28,9 @@ async function call(body, timeoutMs) {
   }
 }
 
-export async function tryOn(personDataUrl, garmentDataUrl, description) {
-  const { image, mask } = await call({ person: personDataUrl, garment: garmentDataUrl, description }, 180000);
-  return { image, mask };
+export async function tryOn(personDataUrl, garmentDataUrl, description, garmentType, body) {
+  const { image, mask, provider } = await call({ person: personDataUrl, garment: garmentDataUrl, description, garmentType, body }, 240000);
+  return { image, mask, provider };
 }
 
 export const pingServer = () => call({ ping: true }, 20000);

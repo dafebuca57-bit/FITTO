@@ -121,3 +121,62 @@ export async function keepOriginalOutsideGarment(originalUrl, generatedUrl, mask
   octx.drawImage(layer, 0, 0);
   return out.toDataURL('image/jpeg', 0.92);
 }
+
+// Recorta (al centro, sin deformar) una foto al cuadro 3:4 de 768x1024 que usa Leffa.
+export async function toTryOnFrame(dataUrl) {
+  const img = await loadImage(dataUrl);
+  const W = 768, H = 1024;
+  const scale = Math.max(W / img.naturalWidth, H / img.naturalHeight);
+  const w = img.naturalWidth * scale, h = img.naturalHeight * scale;
+  const c = canvas(W, H);
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W, H);
+  ctx.drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
+  return c.toDataURL('image/jpeg', 0.92);
+}
+
+// Leffa: máscara blanca = zona que la IA cambió. Fuera de ella se usa tu foto (cara, cabello, fondo).
+export async function keepOriginalOutsideBinaryMask(frameUrl, generatedUrl, maskUrl) {
+  const [orig, gen, mask] = await Promise.all([loadImage(frameUrl), loadImage(generatedUrl), loadImage(maskUrl)]);
+  const W = orig.naturalWidth, H = orig.naturalHeight;
+
+  const sw = 240, sh = Math.round((240 * H) / W);
+  const mc = canvas(sw, sh);
+  const mctx = mc.getContext('2d', { willReadFrequently: true });
+  mctx.drawImage(mask, 0, 0, sw, sh);
+  const md = mctx.getImageData(0, 0, sw, sh);
+  let count = 0;
+  for (let i = 0; i < md.data.length; i += 4) {
+    const on = (md.data[i] + md.data[i + 1] + md.data[i + 2]) / 3 > 127;
+    if (on) count++;
+    md.data[i + 3] = on ? 255 : 0;
+  }
+  if (count < sw * sh * 0.01) return generatedUrl;
+  mctx.putImageData(md, 0, 0);
+
+  // Un poco de margen y borde suave para que no se note la unión.
+  const grown = canvas(sw, sh);
+  const gctx = grown.getContext('2d', { willReadFrequently: true });
+  gctx.filter = 'blur(1.5px)';
+  gctx.drawImage(mc, 0, 0);
+  const gd = gctx.getImageData(0, 0, sw, sh);
+  for (let i = 3; i < gd.data.length; i += 4) gd.data[i] = gd.data[i] > 40 ? 255 : 0;
+  gctx.putImageData(gd, 0, 0);
+  const soft = canvas(sw, sh);
+  const sctx = soft.getContext('2d');
+  sctx.filter = 'blur(1.5px)';
+  sctx.drawImage(grown, 0, 0);
+
+  const layer = canvas(W, H);
+  const lctx = layer.getContext('2d');
+  lctx.drawImage(gen, 0, 0, W, H);
+  lctx.globalCompositeOperation = 'destination-in';
+  lctx.drawImage(soft, 0, 0, sw, sh, 0, 0, W, H);
+
+  const out = canvas(W, H);
+  const octx = out.getContext('2d');
+  octx.drawImage(orig, 0, 0);
+  octx.drawImage(layer, 0, 0);
+  return out.toDataURL('image/jpeg', 0.92);
+}

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Icon from '../components/Icon.jsx';
-import { canTryOn, englishDescription } from '../lib/garments.js';
-import { keepOriginalOutsideGarment } from '../lib/composite.js';
+import { canTryOn, englishDescription, garmentTypeFor } from '../lib/garments.js';
+import { keepOriginalOutsideBinaryMask, keepOriginalOutsideGarment, toTryOnFrame } from '../lib/composite.js';
 import { takePhoto } from '../lib/image.js';
 import { compliment, outfitScore } from '../lib/style.js';
 import { tryOn } from '../lib/tryon.js';
@@ -49,19 +49,23 @@ export default function Probador({ data, actions, initialItemId }) {
     const start = Date.now();
     timer.current = setInterval(() => setElapsed(Math.round((Date.now() - start) / 1000)), 1000);
     try {
-      const raw = await tryOn(profile.photo, sel.image, englishDescription(sel, profile.body));
+      // Tu foto se ajusta al cuadro 3:4 que usa el modelo; así el resultado encaja exacto.
+      const frame = await toTryOnFrame(profile.photo);
+      const raw = await tryOn(frame, sel.image, englishDescription(sel, profile.body), garmentTypeFor(sel), profile.body);
       // Conserva tu cara, cabello y fondo: de la IA solo se usa la zona de la prenda.
       let image = raw.image;
       if (raw.mask) {
         try {
-          image = await keepOriginalOutsideGarment(profile.photo, raw.image, raw.mask);
+          image = raw.provider === 'idm'
+            ? await keepOriginalOutsideGarment(frame, raw.image, raw.mask)
+            : await keepOriginalOutsideBinaryMask(frame, raw.image, raw.mask);
         } catch {
           image = raw.image;
         }
       }
       const score = garmentScore(sel, profile.tone, wardrobe);
       const praise = compliment(score, { colorName: sel.colorName, tone: profile.tone, seed: Date.now() % 7 });
-      const look = { id: uid(), itemId: sel.id, itemName: sel.name, image, score, praise, createdAt: Date.now() };
+      const look = { id: uid(), itemId: sel.id, itemName: sel.name, image, original: frame, score, praise, createdAt: Date.now() };
       setResult(look);
       setShowOriginal(false);
       actions.addLook(look);
@@ -73,7 +77,7 @@ export default function Probador({ data, actions, initialItemId }) {
     }
   }
 
-  const shown = result && !showOriginal ? result.image : profile.photo;
+  const shown = result ? (showOriginal ? result.original ?? profile.photo : result.image) : profile.photo;
 
   return (
     <main className="screen dark">
@@ -147,8 +151,8 @@ export default function Probador({ data, actions, initialItemId }) {
             ))}
           </div>
         )}
-        {sel && sel.category === 'vestido' && (
-          <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--muted-on-ink)' }}>Los vestidos son experimentales: el modelo gratuito funciona mejor con prendas superiores.</p>
+        {sel && sel.category !== 'superior' && (
+          <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--muted-on-ink)' }}>Para pantalones, faldas y vestidos usa una foto de cuerpo completo.</p>
         )}
       </section>
 
