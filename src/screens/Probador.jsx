@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import Icon from '../components/Icon.jsx';
 import { canTryOn, englishDescription, garmentTypeFor } from '../lib/garments.js';
 import { keepOriginalOutsideBinaryMask, keepOriginalOutsideGarment, toTryOnFrame } from '../lib/composite.js';
+import { applyProtection, computeProtection } from '../lib/protect.js';
 import { takePhoto } from '../lib/image.js';
 import { compliment, outfitScore } from '../lib/style.js';
 import { tryOn } from '../lib/tryon.js';
@@ -60,6 +61,8 @@ export default function Probador({ data, actions, initialItemId }) {
     try {
       // Tu foto se ajusta al cuadro 3:4 que usa el modelo; así el resultado encaja exacto.
       const frame = await toTryOnFrame(profile.photo);
+      // Mientras la IA trabaja, el teléfono detecta tu cara y tu silueta (zonas que nunca deben cambiar).
+      const protectionP = computeProtection(frame);
       const raw = await tryOn(frame, sel.image, englishDescription(sel, profile.body), garmentTypeFor(sel), profile.body);
       // Conserva tu cara, cabello y fondo: de la IA solo se usa la zona de la prenda.
       let image = raw.image;
@@ -70,6 +73,15 @@ export default function Probador({ data, actions, initialItemId }) {
             : await keepOriginalOutsideBinaryMask(frame, raw.image, raw.mask);
         } catch {
           image = raw.image;
+        }
+      }
+      // Tu cara, cabello y fondo se copian SIEMPRE de tu foto original, haga lo que haga la IA.
+      const protection = await protectionP;
+      if (protection) {
+        try {
+          image = await applyProtection(frame, image, protection);
+        } catch {
+          /* se queda con la protección de la IA */
         }
       }
       const score = garmentScore(sel, profile.tone, wardrobe);

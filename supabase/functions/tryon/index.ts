@@ -144,7 +144,7 @@ async function leffa(person: Blob, garment: Blob, garmentType: string): Promise<
     42, // semilla
     "dress_code", // modelo entrenado con hombres y mujeres
     garmentType, // upper_body | lower_body | dresses
-    false, // repaint
+    true, // repaint: la IA solo repinta la zona de ropa y conserva el resto
   ]);
   const image = await download(LEFFA, prefix, out[0] as FileRef);
   let mask: string | null = null;

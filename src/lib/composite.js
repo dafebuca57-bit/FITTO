@@ -183,6 +183,48 @@ export async function keepOriginalOutsideBinaryMask(frameUrl, generatedUrl, mask
     }
   }
   for (let p = 0; p < N; p++) if (label[p] !== best) md.data[p * 4 + 3] = 0;
+
+  // Muestras de tu foto (O) y de la generada (G) a la misma resolución reducida.
+  const sampleAt = (img) => {
+    const c = canvas(sw, sh);
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, sw, sh);
+    return ctx.getImageData(0, 0, sw, sh).data;
+  };
+  const O = sampleAt(orig);
+  const G = sampleAt(gen);
+
+  // "No aclarar": la IA suele cambiar el brillo/color de toda la imagen. Se mide ese cambio fuera
+  // de la ropa (donde la imagen debería ser idéntica) y se corrige en la prenda generada.
+  const sumO = [0, 0, 0], sumG = [0, 0, 0];
+  let outside = 0;
+  for (let p = 0, i = 0; p < N; p++, i += 4) {
+    if (md.data[i + 3]) continue;
+    outside++;
+    for (let k = 0; k < 3; k++) {
+      sumO[k] += O[i + k];
+      sumG[k] += G[i + k];
+    }
+  }
+  const gain = sumO.map((o, k) => (outside > N * 0.1 && sumG[k] > 0 ? Math.min(1.25, Math.max(0.8, o / sumG[k])) : 1));
+
+  // "No modificar": dentro de la zona de ropa, si ahí había piel (cuello, brazos) y la IA casi no
+  // la cambió, se usa tu foto original en lugar de la versión generada.
+  const isSkin = (r, g, b) => r > 95 && g > 40 && b > 20 && r > g && r > b && r - g > 12 && Math.max(r, g, b) - Math.min(r, g, b) > 15;
+  const keep = canvas(sw, sh);
+  const kctx = keep.getContext('2d', { willReadFrequently: true });
+  const kd = kctx.createImageData(sw, sh);
+  for (let p = 0, i = 0; p < N; p++, i += 4) {
+    if (!md.data[i + 3]) continue;
+    const d = Math.abs(G[i] * gain[0] - O[i]) + Math.abs(G[i + 1] * gain[1] - O[i + 1]) + Math.abs(G[i + 2] * gain[2] - O[i + 2]);
+    if (isSkin(O[i], O[i + 1], O[i + 2]) && d < 60) kd.data[i + 3] = 255;
+  }
+  kctx.putImageData(kd, 0, 0);
+  // Limpia puntos sueltos: solo cuentan zonas de piel sin cambios de cierto tamaño.
+  const keepClean = blurThreshold(blurThreshold(keep, sw, sh, 1.5, 170), sw, sh, 1.5, 60);
+  const kc = keepClean.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, sw, sh).data;
+  for (let i = 3; i < md.data.length; i += 4) if (kc[i]) md.data[i] = 0;
+
   mctx.putImageData(md, 0, 0);
 
   // Un poco de margen y borde suave para que no se note la unión.
@@ -199,8 +241,18 @@ export async function keepOriginalOutsideBinaryMask(frameUrl, generatedUrl, mask
   sctx.drawImage(grown, 0, 0);
 
   const layer = canvas(W, H);
-  const lctx = layer.getContext('2d');
+  const lctx = layer.getContext('2d', { willReadFrequently: true });
   lctx.drawImage(gen, 0, 0, W, H);
+  // Corrige el brillo/color de la prenda generada para que coincida con la luz de tu foto.
+  if (gain.some((g) => Math.abs(g - 1) > 0.01)) {
+    const img = lctx.getImageData(0, 0, W, H);
+    for (let i = 0; i < img.data.length; i += 4) {
+      img.data[i] = img.data[i] * gain[0];
+      img.data[i + 1] = img.data[i + 1] * gain[1];
+      img.data[i + 2] = img.data[i + 2] * gain[2];
+    }
+    lctx.putImageData(img, 0, 0);
+  }
   lctx.globalCompositeOperation = 'destination-in';
   lctx.drawImage(soft, 0, 0, sw, sh, 0, 0, W, H);
 
@@ -208,5 +260,6 @@ export async function keepOriginalOutsideBinaryMask(frameUrl, generatedUrl, mask
   const octx = out.getContext('2d');
   octx.drawImage(orig, 0, 0);
   octx.drawImage(layer, 0, 0);
-  return out.toDataURL('image/jpeg', 0.92);
+  // Calidad alta: no degradar tu foto al guardar.
+  return out.toDataURL('image/jpeg', 0.95);
 }
